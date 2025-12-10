@@ -24,7 +24,7 @@ public record ModMetadata : AbstractModMetadata
     public override string? License { get; init; } = "MIT";
 }
 
-[Injectable(TypePriority = OnLoadOrder.PostDBModLoader)]
+[Injectable(TypePriority = OnLoadOrder.PostDBModLoader+10)]
 public class DynamicFleaPriceOnLoad(
     ISptLogger<DynamicFleaPriceOnLoad> logger,
     DynamicFleaPrice dynamicFleaPrice
@@ -36,8 +36,32 @@ public class DynamicFleaPriceOnLoad(
         dynamicFleaPrice.LoadDynamicFleaConfig();
         
         logger.Success("Dynamic Flea data and config applied!");
-        dynamicFleaPrice.UpdateCounterByElapsedTime();
+
+        if (dynamicFleaPrice.GetDecreaseOfPurchasePeriod() == null)
+        {
+            logger.Error("The counter update cycle has not started. Check your settings.");
+            return Task.CompletedTask;
+        }
+        
+        var updateCounterByElapsedTimeTask = new Task(() =>
+        {
+            while (true)
+            {
+                Thread.Sleep((int)(dynamicFleaPrice.GetDecreaseOfPurchasePeriod() * 1000)!);
+                try
+                {
+                    dynamicFleaPrice.UpdateCounterByElapsedTime();
+                }
+                catch (Exception ex)
+                {
+                    logger.Warning("error occured while updating flea data: ", ex);
+                }
+                
+            }
+        });
+        updateCounterByElapsedTimeTask.Start();
         
         return Task.CompletedTask;
+        //return;
     }
 }

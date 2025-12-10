@@ -39,7 +39,8 @@ public class RagfairControllerOverride(ISptLogger<RagfairController> logger,
     PaymentService paymentService,
     RagfairPriceService ragfairPriceService,
     RagfairOfferGenerator ragfairOfferGenerator,
-    ConfigServer configServer
+    ConfigServer configServer,
+    DynamicFleaPrice dynamicFleaPrice
     ) : RagfairController(logger, timeUtil, jsonUtil, httpResponseUtil, eventOutputHolder, ragfairServer, itemHelper, inventoryHelper, ragfairSellHelper, handbookHelper, profileHelper, paymentHelper, ragfairHelper, ragfairSortHelper, ragfairOfferHelper, traderHelper, databaseService, localisationService, ragfairTaxService, ragfairOfferService, paymentService, ragfairPriceService, ragfairOfferGenerator, configServer)
 {
     public override ItemEventRouterResponse AddPlayerOffer(PmcData pmcData, AddOfferRequestData offerRequest, MongoId sessionID)
@@ -54,8 +55,10 @@ public class RagfairControllerOverride(ISptLogger<RagfairController> logger,
                 {
                     var output = eventOutputHolder.GetOutput(sessionID);
                     eventOutputHolder.GetOutput(sessionID);
-                    
-                    //return null;
+                    if (dynamicFleaPrice.GetOnlyFoundInRaidForFleaOffers())
+                    {
+                        return null;
+                    }
                 }
             }
         }

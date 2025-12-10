@@ -37,8 +37,6 @@ public class TradeControllerOverride(
     public override ItemEventRouterResponse ConfirmRagfairTrading(PmcData pmcData, ProcessRagfairTradeRequestData request,
         MongoId sessionID)
     {
-        dynamicFleaPrice.UpdateLastPurchasedDate();
-        
         foreach (var requestOffer in request.Offers)
         {
             if(requestOffer.Id == null) continue;
