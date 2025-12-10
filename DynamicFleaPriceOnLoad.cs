@@ -35,7 +35,7 @@ public class DynamicFleaPriceOnLoad(
         dynamicFleaPrice.LoadDynamicFleaData();
         dynamicFleaPrice.LoadDynamicFleaConfig();
         
-        logger.Success("Dynamic Flea data and config applied!");
+        logger.Success("Dynamic Flea Price data and config applied!");
 
         if (dynamicFleaPrice.GetDecreaseOfPurchasePeriod() == null)
         {

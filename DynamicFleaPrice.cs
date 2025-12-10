@@ -14,6 +14,7 @@ public class DynamicFleaPrice(
     DatabaseService databaseService
 )
 {
+    private static string _dataPath = @"user\mods\DynamicFleaPrice\Data\DynamicFleaPriceData.json";
     private DynamicFleaPriceData? _data;
     private DynamicFleaPriceConfig? _config;
 
@@ -24,7 +25,7 @@ public class DynamicFleaPrice(
         MongoId? category = databaseService.GetHandbook().Items
             .Where(handbookItem => handbookItem.Id.Equals(template))
             .Select(handbookItem => handbookItem.ParentId).FirstOrDefault();
-        
+
         if (_config.IncreaseMultiplierPerItem.TryGetValue(template, out var multiplierPerItem))
         {
             configItemMultiplier = multiplierPerItem;
@@ -82,7 +83,7 @@ public class DynamicFleaPrice(
         MongoId category = databaseService.GetHandbook().Items
             .Where(handbookItem => handbookItem.Id.Equals(template))
             .Select(handbookItem => handbookItem.ParentId).FirstOrDefault();
-        
+
         if (category != null!)
         {
             AddItemOrIncreaseItemCategoryCount(category, count);
@@ -140,7 +141,7 @@ public class DynamicFleaPrice(
             {
                 var decreasePercent = _config.DecreaseOfPurchasePercentage * 0.01;
                 var decreaseCountBy = (int)((kvp.Value ?? 0) * decreasePercent);
-                
+
                 // if decreaseCountBy is lower by 1, then just subtract from result 1;
                 if (decreaseCountBy <= 0)
                 {
@@ -157,7 +158,7 @@ public class DynamicFleaPrice(
             {
                 var decreasePercent = _config.DecreaseOfPurchasePercentage * 0.01;
                 var decreaseCountBy = (int)((kvp.Value ?? 0) * decreasePercent);
-                
+
                 // if decreaseCountBy is lower by 1, then just subtract from result 1;
                 if (decreaseCountBy <= 0)
                 {
@@ -175,12 +176,11 @@ public class DynamicFleaPrice(
     {
         try
         {
-            var dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-                @"user\mods\DynamicFleaPrice\Data\DynamicFleaPriceData.json");
+            var dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _dataPath);
             var fileInfo = new FileInfo(dataPath);
-   
+
             fileInfo.Directory?.Create();
-            
+
             var jsonString = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(dataPath, jsonString);
         }
@@ -194,9 +194,8 @@ public class DynamicFleaPrice(
     {
         try
         {
-            var dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-                @"user\mods\DynamicFleaPrice\Data\DynamicFleaPriceData.json");
-            
+            var dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _dataPath);
+
             var jsonContent = File.ReadAllText(dataPath);
             var loadedData = JsonSerializer.Deserialize<DynamicFleaPriceData>(jsonContent, new JsonSerializerOptions
             {
@@ -206,11 +205,10 @@ public class DynamicFleaPrice(
             });
 
             _data = loadedData;
-
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
-            logger.Warning("error on load data, set default: "+ ex.Message);
+            logger.Warning("error on load data, set default: " + ex.Message);
             _data = new DynamicFleaPriceData()
             {
                 ItemPurchased = new Dictionary<string, int?>(),
@@ -224,18 +222,19 @@ public class DynamicFleaPrice(
         try
         {
             var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-                @"user\mods\DynamicFleaPrice\Config\DynamicFleaPriceConfig.json");
+                @"user\mods\DynamicFleaPrice\Config\DynamicFleaPriceConfig.json5");
 
             if (File.Exists(configPath))
             {
                 var jsonContent = File.ReadAllText(configPath);
-                var loadedConfig = JsonSerializer.Deserialize<DynamicFleaPriceConfig>(jsonContent, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    ReadCommentHandling = JsonCommentHandling.Skip,
-                    AllowTrailingCommas = true
-                });
-                
+                var loadedConfig = JsonSerializer.Deserialize<DynamicFleaPriceConfig>(jsonContent,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        ReadCommentHandling = JsonCommentHandling.Skip,
+                        AllowTrailingCommas = true
+                    });
+
                 _config = loadedConfig;
             }
             else
@@ -249,7 +248,7 @@ public class DynamicFleaPrice(
                     DecreaseOfPurchasePeriod = 600,
                 };
 
-            
+
                 var jsonString = JsonSerializer.Serialize(_config, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(configPath, jsonString);
             }
@@ -268,8 +267,8 @@ public class DynamicFleaPrice(
     public int? GetDecreaseOfPurchasePeriod()
     {
         return _config?.DecreaseOfPurchasePeriod;
-    }    
-    
+    }
+
     public bool GetOnlyFoundInRaidForFleaOffers()
     {
         return (bool)_config?.OnlyFoundInRaidForFleaOffers;
@@ -278,8 +277,7 @@ public class DynamicFleaPrice(
 
 public class DynamicFleaPriceData
 {
-    [JsonPropertyName("itemPurchased")] 
-    public required Dictionary<string, int?> ItemPurchased { get; set; }
+    [JsonPropertyName("itemPurchased")] public required Dictionary<string, int?> ItemPurchased { get; set; }
 
     [JsonPropertyName("itemCategoryPurchased")]
     public required Dictionary<string, int?> ItemCategyPurchased { get; set; }
@@ -288,8 +286,8 @@ public class DynamicFleaPriceData
 public class DynamicFleaPriceConfig
 {
     [JsonPropertyName("onlyFoundInRaidForFleaOffers")]
-    public bool OnlyFoundInRaidForFleaOffers { get; set; }    
-    
+    public bool OnlyFoundInRaidForFleaOffers { get; set; }
+
     [JsonPropertyName("decreaseOfPurchasePercentage")]
     public int DecreaseOfPurchasePercentage { get; set; }
 
