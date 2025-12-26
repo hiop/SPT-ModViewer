@@ -23,7 +23,7 @@ public class SPTForgeMod
 
     [JsonPropertyName("thumbnail")] public string Thumbnail { get; set; }
 
-    [JsonPropertyName("detail_url")] public string Detail_Url { get; set; }
+    [JsonPropertyName("detail_url")] public string DetailUrl { get; set; }
 
     [JsonPropertyName("sptVersions")] public List<SPTForgeModVersion> SptVersions { get; set; } = new();
 }
@@ -37,7 +37,7 @@ public class SPTForgeModVersion
     
     [JsonPropertyName("spt_version_constraint")] public string SptVersion { get; set; }
     
-    [JsonPropertyName("fika_compatibility")] public string? Fika_Compatibility { get; set; }
+    [JsonPropertyName("fika_compatibility")] public string? FikaCompatibility { get; set; }
 }
 
 [ExportTs]

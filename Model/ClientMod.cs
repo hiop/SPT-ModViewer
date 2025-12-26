@@ -17,4 +17,19 @@ public class SPTClientMod
     [JsonPropertyName("name")] public string Name { get; set; }
 
     [JsonPropertyName("modVersion")] public string ModVersion { get; set; }
+    
+    [JsonPropertyName("visible")] public bool? Visible { get; set; }
+}
+
+[ExportTs]
+public class HideClientMod
+{
+    [JsonPropertyName("clientName")] public string ClientName { get; set; }
+    [JsonPropertyName("guid")] public string Guid { get; set; }
+}
+
+[ExportTs]
+public class HideServerMod
+{
+    [JsonPropertyName("guid")] public string Guid { get; set; }
 }

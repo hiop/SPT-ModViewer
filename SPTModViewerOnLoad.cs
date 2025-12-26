@@ -28,8 +28,8 @@ public record ModMetadata : AbstractModMetadata
 }
 
 [Injectable(TypePriority = OnLoadOrder.PostSptModLoader)]
-public class SPTModTrackerBridgeOnLoad(
-    ISptLogger<SPTModTrackerBridgeOnLoad> logger,
+public class SPTModViewerOnLoad(
+    ISptLogger<SPTModViewerOnLoad> logger,
     SPTModViewer sptModViewer
     ) : IOnLoad
 {

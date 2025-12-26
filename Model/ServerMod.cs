@@ -26,6 +26,8 @@ public class SPTServerMod
     [JsonPropertyName("modVersion")] 
     public string ModVersion { get; set; }
     
+    [JsonPropertyName("visible")] public bool? Visible { get; set; }
+    
     [JsonPropertyName("sptVersion")] 
     public string SptVersion { get; set; }
 }

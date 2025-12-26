@@ -16,10 +16,11 @@ using SPTarkov.Server.Modding;
 
 namespace SPTModViewer;
 
-[Injectable(TypePriority = 0)]
+[Injectable(TypePriority = 0, InjectionType = InjectionType.Singleton)]
 public class SPTModViewer : WebUiModBase
 {
     private static readonly string _dataPath = @"user\mods\SPTModViewer\Data\";
+    private static readonly string _configPath = @"user\mods\SPTModViewer\Config\SptModViewerConfig.json5";
     private static readonly string _activeClientModsPath = _dataPath + "ActiveClientMods.json5";
     private static readonly string _serverMods = _dataPath + "ServerMods.json5";
     private static readonly string _forgeMods = _dataPath + "ForgeMods.json5";
@@ -27,25 +28,28 @@ public class SPTModViewer : WebUiModBase
     private static readonly HttpClient client = new HttpClient();
     private static ProfileHelper _profileHelper;
     private static ProfileActivityService _profileActivityService;
-    private static ISptLogger<SPTModViewer> _logger;
-
-    // URL path for your mod's web UI (e.g., https://127.0.0.1:6969/mymod/)
-    protected override string BasePath => "/smt";
+    private ISptLogger<SPTModViewer> logger;
+    protected override string BasePath => "/smv";
 
     public SPTModViewer(ModHelper modHelper, ISptLogger<SPTModViewer> logger, ProfileActivityService profileActivityService, ProfileHelper profileHelper)
         : base(modHelper.GetAbsolutePathToModFolder(Assembly.GetExecutingAssembly()))
     {
+        this.logger = logger;
         _profileHelper = profileHelper;
-        _logger = logger;
         _profileActivityService = profileActivityService;
+
+        var config = LoadFromJson<SPTModViewerConfig>(_configPath);
+
+        if (config == null || config?.ForgeApiToken == null)
+        {
+            logger.Error("[SPT Mod Viewer] config file not exist or Forge API token not found");
+        }
+        
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", "ZhKBDIAOj7DeT2yC33qnJaShNKpkm5QJuVR2LBuG383dd4a9");
-        
-        
-        logger.Success("Checking version..."+ProgramStatics.SPT_VERSION());
+            new AuthenticationHeaderValue("Bearer", config?.ForgeApiToken);
     }
 
-    [ApiEndpoint("/smt/api/forge-mod", "POST", Name="updateModByForge", Description = "Update mod with forge if possible")]
+    [ApiEndpoint("/smv/api/forge-mod", "POST", Name="updateModByForge", Description = "Update mod with forge if possible")]
     public async Task<ApiResponse<SPTForgeMod>> UpdateModByForge(ForgeModUpdate update)
     {
         SPTForgeMod? mod = null;
@@ -78,14 +82,24 @@ public class SPTModViewer : WebUiModBase
 
         var exists = forgeMod.SptForgeMods.FirstOrDefault(existMod => existMod.Guid.Equals(mod?.Guid));
 
-        ForgeResponse<SPTForgeModVersion>? versionResponse = await FindModDataById(mod?.Id ?? null);
+        int page = 1;
+        
+        ForgeResponse<SPTForgeModVersion>? versionResponse = await FindModVersionById(mod?.Id ?? null, page);
+
+        while (versionResponse?.Meta.LastPage != page)
+        {
+            page++;
+            var _versionResposne =  await FindModVersionById(mod?.Id ?? null, page);
+            versionResponse?.Data.AddRange(_versionResposne?.Data ?? []);
+            await Task.Delay(1000);
+        }
         
         if (exists?.Name != null)
         {
             exists.Name = mod.Name;
             exists.Teaser = mod.Teaser;
             exists.Thumbnail = mod.Thumbnail;
-            exists.Detail_Url = mod.Detail_Url;
+            exists.DetailUrl = mod.DetailUrl;
             exists.Id = mod.Id;
             exists.SptVersions = versionResponse?.Data ?? exists.SptVersions;
         }
@@ -97,10 +111,10 @@ public class SPTModViewer : WebUiModBase
         
         SaveToJson(forgeMod, _forgeMods);
         
-        return new ApiResponse<SPTForgeMod> { Success = true, Data = mod };
+        return new ApiResponse<SPTForgeMod> { Success = true, Data = exists ?? mod };
     }
     
-    [ApiEndpoint("/smt/api/mods", "GET", Name = "getSptMods",
+    [ApiEndpoint("/smv/api/mods", "GET", Name = "getSptMods",
         Description = "Get all mods from SPT mod list.")]
     public async Task<ApiResponse<SptModResponse>> GetSptMods()
     {
@@ -116,58 +130,123 @@ public class SPTModViewer : WebUiModBase
         return new ApiResponse<SptModResponse> { Data = sptModResponse };
     }
     
-    [ApiEndpoint("/smt/api/mod/active-profile", "POST", Name = "postActiveProfile", Description = "Add all mods if any active profile")]
+    [ApiEndpoint("/smv/api/mod/active-profile", "POST", Name = "postActiveProfile", Description = "Add all mods if any active profile")]
     public async Task<ApiResponse<object>> PostActiveProfile()
     {
-        _profileActivityService.GetActiveProfileIdsWithinMinutes(60)
-            .ForEach(profileIdString =>
-            {
-                var profileId = (MongoId)profileIdString;
-                var mods = _profileActivityService.GetProfileActiveClientMods(profileId);
-                SaveActiveClientMods(mods, profileId);
-            });
-        
+        try
+        {
+            _profileActivityService.GetActiveProfileIdsWithinMinutes(60)
+                .ForEach(profileIdString =>
+                {
+                    var profileId = (MongoId)profileIdString;
+                    var mods = _profileActivityService.GetProfileActiveClientMods(profileId);
+                    SaveActiveClientMods(mods, profileId);
+                });
+        }
+        catch (Exception e)
+        {
+            if (e.StackTrace != null) logger.Warning(e.StackTrace);
+            return new ApiResponse<object> { Success = false, Message = e.Message };
+        }
+
         return new ApiResponse<object> { Success = true };
     }
 
-    [ApiEndpoint("/smt/api/mod/server", "POST", Name = "postServerMod", Description = "Add all mods on server")]
+    [ApiEndpoint("/smv/api/mod/server", "POST", Name = "postServerMod", Description = "Add all mods on server")]
     public async Task<ApiResponse<object>> PostServerMod()
     {
-        
-        List<SptMod> loadedMods = [];
-        if (ProgramStatics.MODS())
+        try
         {
-            loadedMods = ModDllLoader.LoadAllMods();
+            List<SptMod> loadedMods = [];
+            if (ProgramStatics.MODS())
+            {
+                loadedMods = ModDllLoader.LoadAllMods();
+            }
+
+            if (loadedMods.Count == 0)
+            {
+                logger.Warning("No active mods found");
+                return new ApiResponse<object> { Success = true, Message = "No active mods found" };
+            }
+
+            ServerMod? serverMod = LoadFromJson<ServerMod>(_serverMods);
+            serverMod = serverMod ?? new ServerMod();
+
+            loadedMods.ForEach(mod =>
+            {
+                var modMeta = mod.ModMetadata;
+                var exists = serverMod.SptServerMods
+                    .FirstOrDefault(existMod => existMod.Guid.Equals(modMeta.ModGuid));
+
+                if (exists?.Guid != null)
+                {
+                    exists.Guid = modMeta.ModGuid;
+                    exists.SptVersion = modMeta.SptVersion.ToString();
+                    exists.Name = modMeta.Name;
+                    exists.Author = modMeta.Author;
+                    exists.ModVersion = modMeta.Version.ToString();
+                }
+                else
+                {
+                    var sptMod = new SPTServerMod();
+                    sptMod.Guid = modMeta.ModGuid;
+                    sptMod.SptVersion = modMeta.SptVersion.ToString();
+                    sptMod.Name = modMeta.Name;
+                    sptMod.Author = modMeta.Author;
+                    sptMod.ModVersion = modMeta.Version.ToString();
+
+                    serverMod.SptServerMods.Add(sptMod);
+                }
+
+            });
+
+            SaveToJson(serverMod, _serverMods);
+        }
+        catch (Exception e)
+        {
+            if (e.StackTrace != null) logger.Warning(e.StackTrace);
+            return new ApiResponse<object> { Success = false, Message = e.Message };
         }
 
-        if (loadedMods.Count == 0)
+        return new ApiResponse<object> { Success = true };
+    }
+
+    [ApiEndpoint("/smv/api/mod/profile/hide", "POST", Name = "hideProfileMod", Description = "Hide profile mod")]
+    public async Task<ApiResponse<object>> HideClientMod(HideClientMod hideMod)
+    {
+        ClientMod? clientMod = LoadFromJson<ClientMod>(_activeClientModsPath);
+        
+        var existMode = clientMod.SptClientMods[hideMod.ClientName]
+            .FirstOrDefault(m => m.Guid.Equals(hideMod.Guid));
+
+        if (existMode?.Guid != null)
         {
-            _logger.Warning("No active mods found");
-            return new ApiResponse<object> { Success = true, Message = "No active mods found"};
+            existMode.Visible = false;
         }
         
-        ServerMod? serverMod = LoadFromJson<ServerMod>(_serverMods);
-        serverMod = serverMod ?? new ServerMod();
-
-        loadedMods.ForEach(mod =>
-        {
-            var modMeta = mod.ModMetadata;
-            var exists = serverMod.SptServerMods
-                .Any(existMod => existMod.Guid.Equals(modMeta.ModGuid));
-
-            if (exists) return;
-            
-            var sptMod = new SPTServerMod();
-            sptMod.Guid = modMeta.ModGuid;
-            sptMod.SptVersion = modMeta.SptVersion.ToString();
-            sptMod.Name = modMeta.Name;
-            sptMod.Author = modMeta.Author;
-            sptMod.ModVersion = modMeta.Version.ToString();
-            
-            serverMod.SptServerMods.Add(sptMod);
-        });
+        SaveToJson(clientMod, _activeClientModsPath);
         
-        SaveToJson(serverMod, _serverMods);
+        return new ApiResponse<object> { Success = true };
+    }
+    
+    [ApiEndpoint("/smv/api/mod/server/hide", "POST", Name = "hideServerMod", Description = "Hide server mod")]
+    public async Task<ApiResponse<object>> HideServerMod(HideServerMod hideMod)
+    {
+        ServerMod? serverMods = LoadFromJson<ServerMod>(_serverMods);
+        if (serverMods == null)
+        {
+            return new ApiResponse<object> { Success = false, Message = "No active server mods found" };
+        } 
+        
+        var existMode = serverMods?.SptServerMods
+            .FirstOrDefault(m => m.Guid.Equals(hideMod.Guid));
+
+        if (existMode?.Guid != null)
+        {
+            existMode.Visible = false;
+        }
+        
+        SaveToJson(serverMods, _serverMods);
         
         return new ApiResponse<object> { Success = true };
     }
@@ -178,11 +257,13 @@ public class SPTModViewer : WebUiModBase
             $"https://forge.sp-tarkov.com/api/v0/mods?filter[guid]={modGuid}");
     }    
     
-    public async Task<ForgeResponse<SPTForgeModVersion>?> FindModDataById(int? modId)
+    public async Task<ForgeResponse<SPTForgeModVersion>?> FindModVersionById(int? modId, int page)
     {   
         if(modId == null) return null;
+        
         return await client.GetFromJsonAsync<ForgeResponse<SPTForgeModVersion>>(
-            $"https://forge.sp-tarkov.com/api/v0/mod/{modId}/versions") ?? new();
+            $"https://forge.sp-tarkov.com/api/v0/mod/{modId}/versions?page={page}") ?? new();
+        
     }
     
     public async Task<ForgeModResponse?> FindModDataByName(string name)
@@ -194,13 +275,22 @@ public class SPTModViewer : WebUiModBase
     
     private void SaveActiveClientMods(IReadOnlyList<ProfileActiveClientMods> mods, MongoId sessionID)
     {
-        string? pmcName = _profileHelper
-            .GetCompleteProfile(sessionID)
-            .Where(p => !p.Info.Side.Equals("Savage"))
-            .Select(p => p.Info?.Nickname ?? null)
-            .FirstOrDefault();
-
+        string? pmcName = sessionID.ToString();
+        try
+        {
+            pmcName = _profileHelper
+                .GetCompleteProfile(sessionID)
+                .Where(p => !p.Info.Side.Equals("Savage"))
+                .Select(p => p.Info?.Nickname ?? null)
+                .FirstOrDefault();
+        }
+        catch
+        {
+            //
+        }
+        
         pmcName = pmcName ?? sessionID.ToString();
+        if(pmcName.Length <= 0) return;
     
         ClientMod? clientMods = LoadFromJson<ClientMod>(_activeClientModsPath);
         clientMods = clientMods ?? new ClientMod();
@@ -221,11 +311,19 @@ public class SPTModViewer : WebUiModBase
             }).ToList().ForEach(mod =>
       {
           var exists = clientMods.SptClientMods[pmcName]
-              .Any(existMod => existMod.Guid.Equals(mod.Guid));
+              .FirstOrDefault(existMod => existMod.Guid.Equals(mod.Guid));
 
-          if (exists) return;
-              
-          clientMods.SptClientMods[pmcName].Add(mod);
+          if (exists?.Guid != null)
+          {
+              exists.Guid = mod.Guid;
+              exists.ModVersion = mod.ModVersion;
+              exists.Name = mod.Name;
+          }
+          else
+          {
+              clientMods.SptClientMods[pmcName].Add(mod);
+          }
+ 
       });
         
         SaveToJson(clientMods, _activeClientModsPath);
@@ -272,7 +370,7 @@ public class SPTModViewer : WebUiModBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"[SMT] on save data", ex);
+            logger.Error($"[SMT] on save data", ex);
         }
     }
 }
