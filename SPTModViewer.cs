@@ -211,6 +211,79 @@ public class SPTModViewer : WebUiModBase
         return new ApiResponse<object> { Success = true };
     }
 
+    [ApiEndpoint("/smv/api/mod/force-guid", "POST", Name = "setModGuidWithForce", Description = "Set guid of mod with force")]
+    public async Task<ApiResponse<object>> SetModGuidWithForce(ForceModGuidRequest request)
+    {
+        bool setForceGuid = false;
+        if (ModType.SERVER.Equals(request.ModType))
+        {
+            ServerMod? serverMods = LoadFromJson<ServerMod>(_serverMods);
+            var existMode = serverMods?.SptServerMods
+                .FirstOrDefault(m => m.Guid.Equals(request.Guid));
+
+            if (existMode?.Guid != null)
+            {
+                existMode.ForceGuid = request.ForceGuid;
+            }
+            SaveToJson(serverMods, _serverMods);
+            setForceGuid = true;
+        }
+        else if (ModType.CLIENT.Equals(request.ModType))
+        {
+            ClientMod? clientMod = LoadFromJson<ClientMod>(_activeClientModsPath);
+            var existMode = clientMod.SptClientMods[request.ClientName]
+                .FirstOrDefault(m => m.Guid.Equals(request.Guid));
+
+            if (existMode?.Guid != null)
+            {
+                existMode.ForceGuid = request.ForceGuid;
+            }
+            SaveToJson(clientMod, _activeClientModsPath);
+            setForceGuid = true;
+        }
+
+        if (setForceGuid)
+        {
+            await UpdateModByForge(new ForgeModUpdate()
+            {
+                Guid = request.ForceGuid
+            });
+        }
+        
+        return new ApiResponse<object> { Success = true };
+    }
+
+    [ApiEndpoint("/smv/api/mod/force-version", "POST", Name = "setModVersionWithForce", Description = "Set version with force")]
+    public async Task<ApiResponse<object>> SetModVersionWithForce(ForceModVersionRequest request)
+    {
+        if (ModType.SERVER.Equals(request.ModType))
+        {
+            ServerMod? serverMods = LoadFromJson<ServerMod>(_serverMods);
+            var existMode = serverMods?.SptServerMods
+                .FirstOrDefault(m => m.Guid.Equals(request.Guid));
+
+            if (existMode?.Guid != null)
+            {
+                existMode.ForceModVersion = request;
+            }
+            SaveToJson(serverMods, _serverMods);
+        }
+        else if (ModType.CLIENT.Equals(request.ModType))
+        {
+            ClientMod? clientMod = LoadFromJson<ClientMod>(_activeClientModsPath);
+            var existMode = clientMod.SptClientMods[request.ClientName]
+                .FirstOrDefault(m => m.Guid.Equals(request.Guid));
+
+            if (existMode?.Guid != null)
+            {
+                existMode.ForceModVersion = request;
+            }
+            SaveToJson(clientMod, _activeClientModsPath);
+        }
+        
+        return new ApiResponse<object> { Success = true };
+    }
+
     [ApiEndpoint("/smv/api/mod/profile/hide", "POST", Name = "hideProfileMod", Description = "Hide profile mod")]
     public async Task<ApiResponse<object>> HideClientMod(HideClientMod hideMod)
     {

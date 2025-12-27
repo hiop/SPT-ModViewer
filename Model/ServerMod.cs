@@ -17,6 +17,9 @@ public class SPTServerMod
     [JsonPropertyName("guid")] 
     public string Guid { get; set; }
     
+    [JsonPropertyName("forceGuid")] 
+    public string? ForceGuid { get; set; }
+    
     [JsonPropertyName("name")] 
     public string Name { get; set; }
     
@@ -24,7 +27,10 @@ public class SPTServerMod
     public string Author { get; set; }
 
     [JsonPropertyName("modVersion")] 
-    public string ModVersion { get; set; }
+    public string ModVersion { get; set; }    
+    
+    [JsonPropertyName("forceModVersion")] 
+    public ForceModVersion? ForceModVersion { get; set; }
     
     [JsonPropertyName("visible")] public bool? Visible { get; set; }
     

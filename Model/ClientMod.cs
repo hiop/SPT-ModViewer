@@ -14,10 +14,14 @@ public class SPTClientMod
 {
     [JsonPropertyName("guid")] public string Guid { get; set; }
 
+    [JsonPropertyName("forceGuid")] public string? ForceGuid { get; set; }
+
     [JsonPropertyName("name")] public string Name { get; set; }
 
     [JsonPropertyName("modVersion")] public string ModVersion { get; set; }
-    
+
+    [JsonPropertyName("forceModVersion")] public ForceModVersion? ForceModVersion { get; set; }
+
     [JsonPropertyName("visible")] public bool? Visible { get; set; }
 }
 

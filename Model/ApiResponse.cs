@@ -10,3 +10,10 @@ public class ApiResponse<T>
     [JsonPropertyName("message")] public string? Message { get; set; }
     [JsonPropertyName("data")] public T? Data { get; set; }
 }
+
+[ExportTs]
+public enum ModType
+{
+    SERVER = 0,
+    CLIENT = 1
+}
