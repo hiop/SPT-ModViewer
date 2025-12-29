@@ -24,7 +24,9 @@ public class SPTForgeMod
     [JsonPropertyName("thumbnail")] public string Thumbnail { get; set; }
 
     [JsonPropertyName("detail_url")] public string DetailUrl { get; set; }
-
+    
+    [JsonPropertyName("sptVersionLastId")] public int? SptVersionLastId { get; set; }
+    
     [JsonPropertyName("sptVersions")] public List<SPTForgeModVersion> SptVersions { get; set; } = new();
 }
 

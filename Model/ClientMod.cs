@@ -23,6 +23,8 @@ public class SPTClientMod
     [JsonPropertyName("forceModVersion")] public ForceModVersion? ForceModVersion { get; set; }
 
     [JsonPropertyName("visible")] public bool? Visible { get; set; }
+    
+    [JsonPropertyName("uninstalled")] public bool? Uninstalled { get; set; } = false;
 }
 
 [ExportTs]
